@@ -269,7 +269,7 @@
 
 const webSocketServer=require('ws').Server
 var update = require("update-immutable").default;
-const localStorage = require('localStorage')
+const fs = require('fs')
 const wss =new webSocketServer({port:8080}) 
 let bets = {
    1: [],
@@ -360,7 +360,6 @@ wss.on('connection', function connection(ws) {
     ws.on('message', function incoming(data) {
         console.log('od',data)
       wss.clients.forEach(function each(client) {
-
         //...betplaceed send to frontend 
         let res = JSON.parse(data)
 
@@ -369,7 +368,7 @@ wss.on('connection', function connection(ws) {
              console.log('ress',res)
             let prev = bets[res.number].length > 0 && bets[res.number].filter(user => user.name == res.by )
             console.log("prev",prev)
-            let betValue = prev.length > 0 ? parseInt(prev[0].amount) + parseInt(res.betValue) : res.betValue
+            let betValue = prev.length > 0 ? parseInt(prev[0].amount) + parseInt(res.betValue) : res.betValue  
             console.log('prevlenth',betValue)
             if(prev.length > 0) {
                let index = bets[res.number].findIndex(user => user.name == res.by)
@@ -432,6 +431,7 @@ wss.on('connection', function connection(ws) {
 
            Object.keys(numbers).map(number => {
               let winAmountOccurence = getOccurrence(res.data.numbers ,parseInt(number))
+              console.log('winOccurence ',winAmountOccurence)
               let betAmount = numbers[number].betAmount
               numbers = update(numbers , {[number]:{winAmount : {$set:winAmountOccurence*betAmount}}})
               console.log('numbers res', numbers)
@@ -535,13 +535,26 @@ console.log('resroom',res);
 
           ///// connection  estbished to front end
 
+          
           if(res && res.type === "connection") {
-            ws.send(JSON.stringify({type : "changeStatus" , data : { state : "connected to server"}}))
-            client.send(JSON.stringify({type: "connection",
-                            name : res.connection,
-                            data: {status: "ok",token: res.token,uuid: res.uuid   
-                         }
-                        }))
+             try {
+               let lib = JSON.parse(fs.readFileSync('./clients.json', 'utf8'));
+               lib =  update(lib , { clients : {$push : [res]}})
+               const stringToWrite = JSON.stringify(lib, null, ' ')
+                   .replace(/^ +/gm, '')
+                   .replace(/: "(?:[^"]+|\\")*",?$/gm, ' $&');
+               fs.writeFileS('./clients.json',stringToWrite)
+   
+               ws.send(JSON.stringify({type : "changeStatus" , data : { state : "connected to server"}}))
+               client.send(JSON.stringify({type: "connection",
+                               name : res.connection,
+                               data: {status: "ok",token: res.token,uuid: res.uuid   
+                            }
+                  }))
+             } catch (error) {
+                console.log("error",error)
+             }
+            
           }
 
 
